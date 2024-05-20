@@ -95,3 +95,11 @@ Acknowledgments
     colorama: A library for colored terminal text.
     prettytable: A simple Python library for displaying tabular data.
     pyreadline3: A Python library for GNU readline functionality on Windows.
+
+
+
+
+##
+ to learn more about modbus check out this nice introduction.
+``` https://tryhackme.com/r/room/attackingics1
+```
