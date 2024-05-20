@@ -1,0 +1,4 @@
+pymodbus==3.1.2
+colorama==0.4.6
+prettytable==3.6.0
+pyreadline3==3.4.1
