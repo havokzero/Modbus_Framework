@@ -1,5 +1,6 @@
-# modbus_probe Framework
-
+# Modbus Framework
+   allows for easy enumeration and 
+   attack of a modbus device.
 # Modbus Client Project
 
 This project is a comprehensive Modbus client written in Python. It includes functionalities for reading, writing, scanning, and exploiting Modbus devices. The client supports both synchronous and asynchronous operations and can be used for testing and interaction with Modbus servers.
