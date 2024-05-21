@@ -2,8 +2,7 @@ import asyncio
 from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ModbusException
 from colorama import Fore
-from utils import format_data, translate_hex_values, translate_modbus_response, save_data_to_csv, save_data_to_json, \
-    generate_filename, truncate_data
+from utils import format_data, translate_hex_values, translate_modbus_response, save_data_to_csv, save_data_to_json, generate_filename, truncate_data
 from prettytable import PrettyTable
 
 def probe_device(client, unit_id):
@@ -66,9 +65,8 @@ async def scan_unit_ids(client):
 
     print(Fore.CYAN + table.get_string())
 
-def read_registers(client, unit_id, address_ranges):
-    register_type = input(
-        "Enter the register type (coils/discrete_inputs/input_registers/holding_registers): ").strip().lower()
+def read_registers(client, unit_id):
+    register_type = input("Enter the register type (coils/discrete_inputs/input_registers/holding_registers/all): ").strip().lower()
     address = input(f"Enter the address to read (default 0): ").strip()
     count = input(f"Enter the number of registers to read (default 1): ").strip()
 
@@ -84,14 +82,16 @@ def read_registers(client, unit_id, address_ranges):
         response = client.read_input_registers(address, count, unit=unit_id)
     elif register_type == "holding_registers":
         response = client.read_holding_registers(address, count, unit=unit_id)
+    elif register_type == "all":
+        read_all_data(client, unit_id, client.host)
+        return
     else:
         print(Fore.RED + "Invalid register type")
         return
 
     if not response.isError():
         table = PrettyTable(["Address", "Value"])
-        for i, value in enumerate(
-                response.bits if register_type in ['coils', 'discrete_inputs'] else response.registers):
+        for i, value in enumerate(response.bits if register_type in ['coils', 'discrete_inputs'] else response.registers):
             table.add_row([address + i, value])
         print(Fore.CYAN + table.get_string())
     else:
@@ -101,33 +101,30 @@ def read_all_data(client, unit_id, ip_address):
     print(Fore.YELLOW + "Reading all data from Modbus device...")
     try:
         # Read Coils
-        coils_response = client.read_coils(0, 128, unit=unit_id)
-        coils_data = format_data('coils',
-                                 coils_response.bits if not coils_response.isError() else "Error reading coils")
+        coils_response = client.read_coils(0, 2000, unit=unit_id)
+        coils_data = format_data('coils', coils_response.bits if not coils_response.isError() else "Error reading coils")
 
         # Read Discrete Inputs
-        discrete_inputs_response = client.read_discrete_inputs(0, 128, unit=unit_id)
-        discrete_inputs_data = format_data('discrete_inputs',
-                                           discrete_inputs_response.bits if not discrete_inputs_response.isError() else "Error reading discrete inputs")
+        discrete_inputs_response = client.read_discrete_inputs(0, 2000, unit=unit_id)
+        discrete_inputs_data = format_data('discrete_inputs', discrete_inputs_response.bits if not discrete_inputs_response.isError() else "Error reading discrete inputs")
 
         # Read Input Registers
-        input_registers_response = client.read_input_registers(0, 100, unit=unit_id)
-        input_registers_data = format_data('input_registers',
-                                           input_registers_response.registers if not input_registers_response.isError() else "Error reading input registers")
+        input_registers_response = client.read_input_registers(0, 125, unit=unit_id)
+        input_registers_data = format_data('input_registers', input_registers_response.registers if not input_registers_response.isError() else "Error reading input registers")
 
         # Read Holding Registers
-        holding_registers_response = client.read_holding_registers(0, 100, unit=unit_id)
-        holding_registers_data = format_data('holding_registers',
-                                             holding_registers_response.registers if not holding_registers_response.isError() else "Error reading holding registers")
+        holding_registers_response = client.read_holding_registers(0, 125, unit=unit_id)
+        holding_registers_data = format_data('holding_registers', holding_registers_response.registers if not holding_registers_response.isError() else "Error reading holding registers")
 
         # Display data in human-readable format
         table = PrettyTable(["Register Type", "Data"])
         table.align["Register Type"] = "l"
         table.align["Data"] = "l"
-        table.add_row(["Coils", truncate_data(coils_data)])
-        table.add_row(["Discrete Inputs", truncate_data(discrete_inputs_data)])
-        table.add_row(["Input Registers", truncate_data(input_registers_data)])
-        table.add_row(["Holding Registers", truncate_data(holding_registers_data)])
+        table.max_width = {"Data": 1000}
+        table.add_row(["Coils", truncate_data(coils_data, 1000)])
+        table.add_row(["Discrete Inputs", truncate_data(discrete_inputs_data, 1000)])
+        table.add_row(["Input Registers", truncate_data(input_registers_data, 1000)])
+        table.add_row(["Holding Registers", truncate_data(holding_registers_data, 1000)])
 
         print(Fore.CYAN + table.get_string())
 
@@ -150,8 +147,9 @@ def read_all_data(client, unit_id, ip_address):
         table = PrettyTable(["Register Type", "Translated Data"])
         table.align["Register Type"] = "l"
         table.align["Translated Data"] = "l"
+        table.max_width = {"Translated Data": 1000}
         for item in translated_data:
-            table.add_row([item[0], truncate_data(item[1])])
+            table.add_row([item[0], truncate_data(item[1], 1000)])
 
         print(Fore.CYAN + "Translated Data:")
         print(table)
@@ -165,7 +163,7 @@ def read_all_data(client, unit_id, ip_address):
 def read_messages(client, unit_id, ip_address):
     print(Fore.YELLOW + "Reading messages from Modbus device...")
     try:
-        response = client.read_holding_registers(0, 100, unit=unit_id)
+        response = client.read_holding_registers(0, 125, unit=unit_id)
         if not response.isError():
             table = PrettyTable(["Register Type", "Value"])
             table.add_row(["Holding Registers", translate_modbus_response(response)])
@@ -176,7 +174,6 @@ def read_messages(client, unit_id, ip_address):
             print(Fore.RED + f"Error reading messages: {response}")
     except ModbusException as e:
         print(Fore.RED + f"Failed to read messages: {e}")
-
 
 def grab_banner(client, unit_id, ip_address):
     print(Fore.YELLOW + "Grabbing banner from Modbus device...")
@@ -232,3 +229,27 @@ def parse_banner(data):
     except Exception as e:
         print(Fore.RED + f"Error parsing banner: {e}")
 
+def read_coils(client, unit_id):
+    """
+    Function to read coils from a Modbus device.
+
+    :param client: ModbusTcpClient object
+    :param unit_id: Unit ID of the Modbus device
+    """
+    try:
+        address = int(input("Enter the address to read coils (default 0): ").strip() or 0)
+        count = int(input("Enter the number of coils to read (default 1): ").strip() or 1)
+
+        response = client.read_coils(address, count, unit=unit_id)
+        if not response.isError():
+            table = PrettyTable(["Address", "Value"])
+            for i, value in enumerate(response.bits):
+                table.add_row([address + i, value])
+            print(Fore.CYAN + table.get_string())
+        else:
+            print(Fore.RED + f"Failed to read coils. Error: {response}")
+
+    except ValueError:
+        print(Fore.RED + "Invalid input. Please enter a valid address and number of coils.")
+    except ModbusException as e:
+        print(Fore.RED + f"Error reading coils: {e}")
